@@ -1,0 +1,203 @@
+<!-- 文件：web/templates/index.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>流量异常检测系统</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>流量异常检测系统</h1>
+        
+        <!-- 功能选择 -->
+        <div class="tabs">
+            <button onclick="showTab('realtime')">实时监测</button>
+            <button onclick="showTab('historical')">历史检测</button>
+            <button onclick="showTab('train')">模型训练</button>
+        </div>
+
+        <!-- 实时监测面板 -->
+        <div id="realtime" class="tab-content active">
+            <h2>实时流量监测</h2>
+            <div class="control-group">
+                <select id="realtime-model">
+                    <option value="DNN">DNN模型</option>
+                    <option value="LSTM">LSTM模型</option>
+                </select>
+                <button onclick="startRealtime()">启动监测</button>
+                <button onclick="stopRealtime()">停止监测</button>
+                <button onclick="clearConsole('realtime')">清空日志</button>
+            </div>
+            <div class="console-container">
+                <pre id="realtime-content" class="console-content"></pre>
+                <div class="console-status">
+                    <span class="status-indicator"></span>
+                    <span class="status-text">监测已停止</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 历史检测面板 -->
+        <div id="historical" class="tab-content">
+            <h2>历史数据分析</h2>
+            <div class="control-group">
+                <input type="file" id="data-file" accept=".csv">
+                <select id="historical-model">
+                    <option value="DNN">DNN模型</option>
+                    <option value="LSTM">LSTM模型</option>
+                </select>
+                <select id="historical-mode">
+                    <option value="predict">预测模式</option>
+                    <option value="evaluate">评估模式</option>
+                </select>
+                <button onclick="runHistorical()">执行分析</button>
+                <button onclick="clearConsole('historical')">清空结果</button>
+            </div>
+            <div class="console-container">
+                <pre id="historical-result" class="console-content"></pre>
+                <div class="console-status">
+                    <span class="status-indicator"></span>
+                    <span class="status-text">就绪</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 模型训练面板 -->
+        <div id="train" class="tab-content">
+            <h2>模型训练</h2>
+            <div class="control-group">
+                <select id="train-model">
+                    <option value="DNN">DNN模型</option>
+                    <option value="LSTM">LSTM模型</option>
+                </select>
+                <input type="number" id="epochs" placeholder="训练轮数" value="10" min="1">
+                <input type="number" id="batch-size" placeholder="批次大小" value="32" min="1">
+                <button onclick="startTraining()">开始训练</button>
+            </div>
+            <div id="training-status" class="training-status"></div>
+        </div>
+    </div>
+
+    <script>
+        // 标签页切换
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.getElementById(tabName).classList.add('active');
+        }
+
+        // 实时监测控制
+        let realtimeInterval;
+        let isRealtimeScrolling = false;
+
+        function updateRealtimeOutput() {
+            const content = document.getElementById('realtime-content');
+            const isAtBottom = content.scrollHeight - content.scrollTop <= content.clientHeight + 50;
+            
+            axios.get('/realtime/output').then(response => {
+                const prevHeight = content.scrollHeight;
+                content.textContent = response.data.output;
+                
+                if (!isRealtimeScrolling || isAtBottom) {
+                    content.scrollTop = content.scrollHeight;
+                }
+
+                updateStatus('realtime', response.data);
+            });
+        }
+
+        function startRealtime() {
+            const modelType = document.getElementById('realtime-model').value;
+            axios.post('/realtime', { model_type: modelType })
+                .then(() => {
+                    realtimeInterval = setInterval(updateRealtimeOutput, 500);
+                    updateRealtimeOutput();
+                })
+                .catch(handleError);
+        }
+
+        function stopRealtime() {
+            clearInterval(realtimeInterval);
+            axios.delete('/realtime').catch(handleError);
+        }
+
+        // 历史检测控制
+        let isHistoricalScrolling = false;
+
+        async function runHistorical() {
+            const btn = document.querySelector('#historical button');
+            btn.disabled = true;
+            btn.innerHTML = '<div class="loader"></div> 分析中...';
+            const fileInput = document.getElementById('data-file');
+            if (!fileInput.files.length) {
+                alert('请选择CSV文件');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('model_type', document.getElementById('historical-model').value);
+            formData.append('mode', document.getElementById('historical-mode').value);
+
+            try {
+                const response = await axios.post('/historical', formData, {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                    }
+                });
+                
+                const resultDiv = document.getElementById('historical-result');
+                resultDiv.textContent = response.data.output || response.data.error;
+                resultDiv.style.color = response.data.error ? '#ff0000' : '#00aa00';
+                
+            } catch (err) {
+                console.error('分析失败:', err);
+                alert(`分析失败: ${err.response?.data?.error || err.message}`);
+            }
+            finally {
+                btn.disabled = false;
+                btn.textContent = '执行分析';
+            }
+        }
+
+        // 通用功能
+        function clearConsole(type) {
+            const content = document.getElementById(`${type}-content`);
+            const status = document.querySelector(`#${type} .status-text`);
+            content.textContent = '';
+            status.textContent = type === 'realtime' ? '监测已停止' : '就绪';
+            status.style.color = '#fff';
+        }
+
+        function updateStatus(type, data) {
+            const indicator = document.querySelector(`#${type} .status-indicator`);
+            const statusText = document.querySelector(`#${type} .status-text`);
+            
+            if (data.error) {
+                indicator.style.backgroundColor = '#ff0000';
+                statusText.textContent = `错误: ${data.error}`;
+                statusText.style.color = '#ff0000';
+            } else if (data.active) {
+                indicator.style.backgroundColor = '#00ff00';
+                statusText.textContent = type === 'realtime' 
+                    ? `运行中 (PID: ${data.pid})` 
+                    : '分析完成';
+                statusText.style.color = '#00ff00';
+            } else {
+                indicator.style.backgroundColor = '#ff0000';
+                statusText.textContent = type === 'realtime' ? '已停止' : '就绪';
+                statusText.style.color = '#ff0000';
+            }
+        }
+
+        function handleError(err) {
+            console.error(err);
+            alert(`操作失败: ${err.response?.data?.error || err.message}`);
+        }
+
+        // 模型训练相关代码保持不变...
+    </script>
+</body>
+</html>
