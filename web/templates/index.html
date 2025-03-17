@@ -9,7 +9,7 @@
 <body>
     <div class="container">
         <h1>流量异常检测系统</h1>
-        
+
         <!-- 功能选择 -->
         <div class="tabs">
             <button onclick="showTab('realtime')">实时监测</button>
@@ -95,11 +95,11 @@
         function updateRealtimeOutput() {
             const content = document.getElementById('realtime-content');
             const isAtBottom = content.scrollHeight - content.scrollTop <= content.clientHeight + 50;
-            
+
             axios.get('/realtime/output').then(response => {
                 const prevHeight = content.scrollHeight;
                 content.textContent = response.data.output;
-                
+
                 if (!isRealtimeScrolling || isAtBottom) {
                     content.scrollTop = content.scrollHeight;
                 }
@@ -120,6 +120,7 @@
 
         function stopRealtime() {
             clearInterval(realtimeInterval);
+            updateStatus('realtime', { active: false, pid: null });  // 关键修复
             axios.delete('/realtime').catch(handleError);
         }
 
@@ -147,11 +148,11 @@
                         'Content-Type': 'multipart/form-data',
                     }
                 });
-                
+
                 const resultDiv = document.getElementById('historical-result');
                 resultDiv.textContent = response.data.output || response.data.error;
                 resultDiv.style.color = response.data.error ? '#ff0000' : '#00aa00';
-                
+
             } catch (err) {
                 console.error('分析失败:', err);
                 alert(`分析失败: ${err.response?.data?.error || err.message}`);
@@ -174,15 +175,15 @@
         function updateStatus(type, data) {
             const indicator = document.querySelector(`#${type} .status-indicator`);
             const statusText = document.querySelector(`#${type} .status-text`);
-            
+
             if (data.error) {
                 indicator.style.backgroundColor = '#ff0000';
                 statusText.textContent = `错误: ${data.error}`;
                 statusText.style.color = '#ff0000';
             } else if (data.active) {
                 indicator.style.backgroundColor = '#00ff00';
-                statusText.textContent = type === 'realtime' 
-                    ? `运行中 (PID: ${data.pid})` 
+                statusText.textContent = type === 'realtime'
+                    ? `运行中 (PID: ${data.pid})`
                     : '分析完成';
                 statusText.style.color = '#00ff00';
             } else {

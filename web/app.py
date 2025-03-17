@@ -95,7 +95,7 @@ def read_output():
 def get_realtime_output():
     return jsonify({
         "output": "\n".join(realtime_monitor.output_buffer),
-        "active": realtime_monitor.running,
+        "active": realtime_monitor.running and realtime_monitor.process is not None,
         "pid": realtime_monitor.process.pid if realtime_monitor.process else None
     })
 
@@ -110,6 +110,7 @@ def stop_realtime():
 
 def stop_realtime_process():
     """安全的进程停止方法"""
+    realtime_monitor.running = False  # 提前设置
     if realtime_monitor.process:
         # Windows专用终止方法
         if os.name == 'nt':
@@ -123,7 +124,6 @@ def stop_realtime_process():
 
         realtime_monitor.process.wait(timeout=5)
         realtime_monitor.process = None
-        realtime_monitor.running = False
 
 @app.route('/historical', methods=['POST'])
 def run_historical():
