@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# coding=UTF-8  
+# coding=UTF-8
 from __future__ import absolute_import, division, print_function, unicode_literals
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 禁用TensorFlow的冗余日志（只显示错误和警告）
@@ -15,7 +15,7 @@ from sklearn.model_selection import train_test_split
 
 TRAIN_SPLIT = 30000
 
-CSV_FILE_PATH = '/Users/klaus_imac/Desktop/毕设/数据集/IDS2017/Test/dataset.csv'
+CSV_FILE_PATH = 'E:\\workplace\\Code\\VSCodeProject\\Traffic_Anomaly_Detection_based\\category\\binary_classification.csv'
 df = pd.read_csv(CSV_FILE_PATH)
 
 #修改数据类型
