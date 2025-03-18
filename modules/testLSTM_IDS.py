@@ -4,12 +4,9 @@
 基于LSTM的流量异常检测系统（集成标准化层版本）
 """
 
-# %% [1] 环境配置
+#region [1] 环境配置
 import os
-import sys
-import json
 import numpy as np
-import pandas as pd
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
 from common_utils import *
@@ -22,10 +19,10 @@ os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'   # 禁用可能不稳定的优化
 
 configure_matplotlib()
 import matplotlib.pyplot as plt
+#endregion
 
 
-
-# 执行数据准备
+#region [2]执行数据准备
 features, labels, n_classes, class_names = load_and_preprocess_data()
 labels = labels.to_frame(name='Label')
 '''
@@ -34,7 +31,7 @@ labels = labels.to_frame(name='Label')
 ​**name='Label' 参数**：
 指定生成的新 DataFrame 的列名
 '''
-# %% [3] 时序数据生成器
+# 时序数据生成器
 PAST_HISTORY = 1000  # 历史窗口
 FUTURE_TARGET = 10   # 预测窗口
 STEP = 6             # 采样间隔
@@ -87,9 +84,10 @@ BATCH_SIZE = 256
 train_dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train))
 train_dataset = train_dataset.shuffle(10000).batch(BATCH_SIZE).prefetch(1)
 val_dataset = tf.data.Dataset.from_tensor_slices((x_val, y_val)).batch(BATCH_SIZE)
+#endregion
 
-
-# %% [4] 模型构建与训练
+#region [3] 模型构建与训练
+# 构建模型
 def build_lstm_model(input_shape):
     """构建LSTM模型"""
     normalization_layer = tf.keras.layers.Normalization(axis=-1)
@@ -119,8 +117,7 @@ def build_lstm_model(input_shape):
     return model
 
 model = build_lstm_model((x_train.shape[1], x_train.shape[2]))
-# input_shape=x_train_single.shape[-2:] = (x_train.shape[1], x_train.shape[2])
-
+# input_shape=x_train_single.shape[-2:] 与原项目代码 (x_train.shape[1], x_train.shape[2]) 一个意思
 
 # 训练模型
 def compile_and_train(model):
@@ -144,37 +141,48 @@ def compile_and_train(model):
         callbacks=[early_stopping],
         verbose=1
     )
+    return history
 
 print("\n开始训练模型...")
 history = compile_and_train(model)
+#endregion
 
-sample_input = x_train[:1]
-loss_fn = tf.keras.losses.SparseCategoricalCrossentropy()
-with tf.GradientTape() as tape:
-    predictions = model(sample_input)
-    loss_value = loss_fn(y_train[:1], predictions)  # 正确调用方式
-
-grads = tape.gradient(loss_value, model.trainable_variables)
-print("\n梯度范数分析:")
-for g, v in zip(grads, model.trainable_variables):
-    if 'lstm' in v.name:
-        print(f"{v.name:30} {tf.norm(g):.4e}")
-
-# 执行可视化
-plot_training_history(history)
+#region [4]执行可视化
+plot_training_history(history, 'LSTM')
 
 # 生成预测结果
 print("\n生成预测结果...")
 y_pred = model.predict(val_dataset).argmax(axis=1)
 y_true = np.concatenate([y for x, y in val_dataset], axis=0)
 
-plot_confusion_matrix(y_true, y_pred, class_names)
-
-
-save_model_and_labels(model, class_names)
+# 混淆矩阵可视化
+plot_confusion_matrix(y_true, y_pred, class_names, 'LSTM')
+save_model_and_labels(model, class_names, 'LSTM')
 
 # 最终评估
-test_loss, test_acc, test_auc = model.evaluate(val_dataset, verbose=0)
+test_loss, test_acc, test_auc = model.evaluate(val_dataset, verbose=0)  # metrics=[tf.keras.metrics.Precision(), tf.keras.metrics.Recall()]返回[loss, precision, recall]
 print(f"\n验证集准确率: {test_acc:.4f}")
 print(f"验证集AUC: {test_auc:.4f}")
 print(f"验证集损失值: {test_loss:.4f}")
+
+# 选取单个训练样本
+sample_input = x_train[:1]  # 形状 (1, 时间步长, 特征数)
+
+# 定义损失函数
+loss_fn = tf.keras.losses.SparseCategoricalCrossentropy()
+
+# 梯度计算上下文
+with tf.GradientTape() as tape:
+    # 前向传播计算预测值
+    predictions = model(sample_input)
+    # 计算损失值
+    loss_value = loss_fn(y_train[:1], predictions)
+
+# 计算梯度
+grads = tape.gradient(loss_value, model.trainable_variables)
+
+# 分析LSTM层梯度
+print("\n梯度范数分析:")
+for g, v in zip(grads, model.trainable_variables):
+    if 'lstm' in v.name:
+        print(f"{v.name:30} {tf.norm(g):.4e}")

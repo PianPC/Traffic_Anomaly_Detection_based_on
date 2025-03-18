@@ -1,4 +1,5 @@
 import os
+import json
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -88,7 +89,7 @@ def ensure_dir(path):
     if not os.access(path, os.W_OK):
         raise PermissionError(f"无权限写入目录: {path}")
 
-def plot_training_history(history):
+def plot_training_history(history, model_type):
     """绘制训练指标图表"""
     plt.figure(figsize=(12, 5), dpi=150)
 
@@ -114,14 +115,14 @@ def plot_training_history(history):
     output_dir = get_absolute_path('results/figures')
     ensure_dir(output_dir)
     plt.savefig(
-        os.path.join(output_dir, 'training_metrics.png'),
+        os.path.join(output_dir, f'{model_type}_training_metrics.png'),
         bbox_inches='tight',
         pad_inches=0.2
     )
     plt.close()
     print(f"训练指标图表已保存至: {output_dir}")
 
-def plot_confusion_matrix(y_true, y_pred, classes):
+def plot_confusion_matrix(y_true, y_pred, classes, model_type):
     """绘制混淆矩阵"""
     from sklearn.metrics import confusion_matrix
     import seaborn as sns
@@ -140,7 +141,7 @@ def plot_confusion_matrix(y_true, y_pred, classes):
     output_dir = get_absolute_path('results/figures')
     ensure_dir(output_dir)
     plt.savefig(
-        os.path.join(output_dir, 'confusion_matrix.png'),
+        os.path.join(output_dir, f'{model_type}_confusion_matrix.png'),
         bbox_inches='tight',
         pad_inches=0.3
     )
@@ -148,13 +149,13 @@ def plot_confusion_matrix(y_true, y_pred, classes):
     print(f"混淆矩阵已保存至: {output_dir}")
 
 # %% [6] 模型保存与评估
-def save_model_and_labels(model, class_names):
+def save_model_and_labels(model, class_names, model_type):
     """保存模型和标签映射"""
     model_dir = get_absolute_path('models')
     ensure_dir(model_dir)
 
     # 保存模型
-    model_path = os.path.join(model_dir, 'lstm_traffic_model.keras')
+    model_path = os.path.join(model_dir, f'{model_type}_traffic_model.keras')
     model.save(model_path)
 
     # 保存标签映射
@@ -163,5 +164,5 @@ def save_model_and_labels(model, class_names):
     with open(label_path, 'w', encoding='utf-8') as f:
         json.dump(label_map, f, indent=2, ensure_ascii=False)
 
-    print(f"\n模型已保存至: {model_path}")
+    print(f"\n模型已保存至: {model_dir}")
     print(f"标签映射已保存至: {label_path}")
